@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,18 +29,36 @@ const Chat = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
-      setGroups(storage.getGroups(user.id));
-    }
-  }, [user]);
+    const updateMessages = () => {
+      if (user && (selectedUser || selectedGroup)) {
+        const chatMessages = storage.getMessages(
+          user.id,
+          selectedUser?.id,
+          selectedGroup?.id
+        );
+        setMessages(chatMessages);
+      }
+    };
+
+    const updateGroups = () => {
+      if (user) {
+        setGroups(storage.getGroups(user.id));
+      }
+    };
+
+    storage.subscribe('messages', updateMessages);
+    storage.subscribe('groups', updateGroups);
+
+    return () => {
+      storage.unsubscribe('messages', updateMessages);
+      storage.unsubscribe('groups', updateGroups);
+    };
+  }, [user, selectedUser, selectedGroup]);
 
   useEffect(() => {
     if (searchQuery.trim()) {
-      const allUsers = storage.getAllUsers();
-      const results = allUsers.filter(u => 
-        u.id !== user?.id && 
-        u.username.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const results = storage.searchUsers(searchQuery)
+        .filter(u => u.id !== user?.id);
       setSearchResults(results);
     } else {
       setSearchResults([]);
@@ -80,6 +97,7 @@ const Chat = () => {
     setGroups(prev => [...prev, group]);
     setNewGroupName('');
     setSelectedMembers([]);
+    
     toast({
       title: "Success",
       description: "Group created successfully",

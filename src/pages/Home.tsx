@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,24 +18,49 @@ const Home = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const allPosts = storage.getPosts();
-    const allUsers = storage.getAllUsers().reduce((acc, user) => {
-      acc[user.id] = user;
-      return acc;
-    }, {} as Record<string, User>);
+    const updatePosts = () => {
+      const allPosts = storage.getPosts();
+      setPosts(allPosts.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ));
+    };
+
+    const updateComments = () => {
+      posts.forEach(post => {
+        const postComments = storage.getComments(post.id);
+        setComments(prev => ({ ...prev, [post.id]: postComments }));
+      });
+    };
+
+    // Initial load
+    updatePosts();
     
-    setPosts(allPosts.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    ));
-    setUsers(allUsers);
+    // Subscribe to changes
+    storage.subscribe('posts', updatePosts);
+    storage.subscribe('comments', updateComments);
+
+    return () => {
+      storage.unsubscribe('posts', updatePosts);
+      storage.unsubscribe('comments', updateComments);
+    };
   }, []);
 
   useEffect(() => {
-    posts.forEach(post => {
-      const postComments = storage.getComments(post.id);
-      setComments(prev => ({ ...prev, [post.id]: postComments }));
-    });
-  }, [posts]);
+    const updateUsers = () => {
+      const allUsers = storage.getAllUsers().reduce((acc, user) => {
+        acc[user.id] = user;
+        return acc;
+      }, {} as Record<string, User>);
+      setUsers(allUsers);
+    };
+
+    updateUsers();
+    storage.subscribe('users', updateUsers);
+
+    return () => {
+      storage.unsubscribe('users', updateUsers);
+    };
+  }, []);
 
   const handleAddComment = (postId: string) => {
     if (!newComment.trim() || !user) return;

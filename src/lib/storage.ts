@@ -1,4 +1,3 @@
-
 import bcrypt from 'bcryptjs';
 
 export interface User {
@@ -45,6 +44,28 @@ export interface Group {
 }
 
 class LocalStorage {
+  private subscribers: Map<string, Set<() => void>> = new Map();
+
+  constructor() {
+    window.addEventListener('storage', (event) => {
+      if (event.key) {
+        const subscribers = this.subscribers.get(event.key);
+        subscribers?.forEach(callback => callback());
+      }
+    });
+  }
+
+  subscribe(key: string, callback: () => void) {
+    if (!this.subscribers.has(key)) {
+      this.subscribers.set(key, new Set());
+    }
+    this.subscribers.get(key)?.add(callback);
+  }
+
+  unsubscribe(key: string, callback: () => void) {
+    this.subscribers.get(key)?.delete(callback);
+  }
+
   private getItem<T>(key: string): T[] {
     const item = localStorage.getItem(key);
     return item ? JSON.parse(item) : [];
@@ -52,9 +73,10 @@ class LocalStorage {
 
   private setItem<T>(key: string, value: T[]): void {
     localStorage.setItem(key, JSON.stringify(value));
+    const subscribers = this.subscribers.get(key);
+    subscribers?.forEach(callback => callback());
   }
 
-  // User methods
   async createUser(username: string, email: string, password: string): Promise<User | null> {
     const users = this.getItem<User>('users');
     
@@ -117,7 +139,13 @@ class LocalStorage {
     return this.getItem<User>('users');
   }
 
-  // Post methods
+  searchUsers(query: string): User[] {
+    const users = this.getItem<User>('users');
+    return users.filter(u => 
+      u.username.toLowerCase().includes(query.toLowerCase())
+    );
+  }
+
   createPost(userId: string, content: string, imageUrl?: string): Post {
     const posts = this.getItem<Post>('posts');
     const newPost: Post = {
@@ -153,7 +181,6 @@ class LocalStorage {
     return false;
   }
 
-  // Comment methods
   createComment(postId: string, userId: string, content: string): Comment {
     const comments = this.getItem<Comment>('comments');
     const newComment: Comment = {
@@ -173,7 +200,6 @@ class LocalStorage {
     return this.getItem<Comment>('comments').filter(c => c.postId === postId);
   }
 
-  // Message methods
   createMessage(senderId: string, content: string, receiverId?: string, groupId?: string): Message {
     const messages = this.getItem<Message>('messages');
     const newMessage: Message = {
@@ -204,7 +230,6 @@ class LocalStorage {
     return messages.filter(m => m.senderId === userId || m.receiverId === userId);
   }
 
-  // Group methods
   createGroup(name: string, ownerId: string, members: string[]): Group {
     const groups = this.getItem<Group>('groups');
     const newGroup: Group = {
