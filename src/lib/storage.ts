@@ -39,6 +39,7 @@ export interface Message {
 export interface Group {
   id: string;
   name: string;
+  ownerId: string;
   members: string[];
   createdAt: string;
 }
@@ -57,7 +58,6 @@ class LocalStorage {
   async createUser(username: string, email: string, password: string): Promise<User | null> {
     const users = this.getItem<User>('users');
     
-    // Check if username or email already exists
     if (users.some(u => u.username === username || u.email === email)) {
       return null;
     }
@@ -86,6 +86,35 @@ class LocalStorage {
     
     const isValid = await bcrypt.compare(password, user.password);
     return isValid ? user : null;
+  }
+
+  getUser(userId: string): User | null {
+    const users = this.getItem<User>('users');
+    return users.find(u => u.id === userId) || null;
+  }
+
+  getUserByUsername(username: string): User | null {
+    const users = this.getItem<User>('users');
+    return users.find(u => u.username === username) || null;
+  }
+
+  updateUserProfile(userId: string, profileImage: string): User | null {
+    const users = this.getItem<User>('users');
+    const userIndex = users.findIndex(u => u.id === userId);
+    
+    if (userIndex === -1) return null;
+    
+    users[userIndex] = {
+      ...users[userIndex],
+      profileImage
+    };
+    
+    this.setItem('users', users);
+    return users[userIndex];
+  }
+
+  getAllUsers(): User[] {
+    return this.getItem<User>('users');
   }
 
   // Post methods
@@ -176,12 +205,13 @@ class LocalStorage {
   }
 
   // Group methods
-  createGroup(name: string, members: string[]): Group {
+  createGroup(name: string, ownerId: string, members: string[]): Group {
     const groups = this.getItem<Group>('groups');
     const newGroup: Group = {
       id: crypto.randomUUID(),
       name,
-      members,
+      ownerId,
+      members: [ownerId, ...members],
       createdAt: new Date().toISOString()
     };
 
@@ -192,6 +222,34 @@ class LocalStorage {
 
   getGroups(userId: string): Group[] {
     return this.getItem<Group>('groups').filter(g => g.members.includes(userId));
+  }
+
+  updateGroupMembers(groupId: string, userId: string, memberIds: string[]): Group | null {
+    const groups = this.getItem<Group>('groups');
+    const groupIndex = groups.findIndex(g => g.id === groupId);
+    
+    if (groupIndex === -1 || groups[groupIndex].ownerId !== userId) return null;
+    
+    groups[groupIndex] = {
+      ...groups[groupIndex],
+      members: [userId, ...memberIds]
+    };
+    
+    this.setItem('groups', groups);
+    return groups[groupIndex];
+  }
+
+  removeGroupMember(groupId: string, userId: string, memberId: string): boolean {
+    const groups = this.getItem<Group>('groups');
+    const groupIndex = groups.findIndex(g => g.id === groupId);
+    
+    if (groupIndex === -1 || groups[groupIndex].ownerId !== userId) return false;
+    
+    const members = groups[groupIndex].members.filter(id => id !== memberId);
+    groups[groupIndex].members = members;
+    
+    this.setItem('groups', groups);
+    return true;
   }
 }
 

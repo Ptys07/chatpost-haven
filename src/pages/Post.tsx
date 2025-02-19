@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,9 +14,21 @@ import { ImagePlus } from 'lucide-react';
 const Post = () => {
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImageUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,22 +61,22 @@ const Post = () => {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="imageUrl">Image URL (optional)</Label>
+          <Label htmlFor="image">Image</Label>
           <div className="flex gap-2">
-            <Input
-              id="imageUrl"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="Enter image URL"
-              className="bg-secondary"
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
             />
             <Button
               type="button"
               variant="outline"
-              size="icon"
-              onClick={() => document.getElementById('imageUrl')?.focus()}
+              onClick={() => fileInputRef.current?.click()}
             >
-              <ImagePlus className="h-4 w-4" />
+              <ImagePlus className="h-4 w-4 mr-2" />
+              Choose Image
             </Button>
           </div>
         </div>

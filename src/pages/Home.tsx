@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { storage, Post, Comment, User } from '@/lib/storage';
 import { useAuth } from '@/lib/auth';
-import { MessageSquare, Trash2 } from 'lucide-react';
+import { MessageSquare, Trash2, User as UserIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 const Home = () => {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -19,9 +20,15 @@ const Home = () => {
 
   useEffect(() => {
     const allPosts = storage.getPosts();
+    const allUsers = storage.getAllUsers().reduce((acc, user) => {
+      acc[user.id] = user;
+      return acc;
+    }, {} as Record<string, User>);
+    
     setPosts(allPosts.sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     ));
+    setUsers(allUsers);
   }, []);
 
   useEffect(() => {
@@ -40,7 +47,6 @@ const Home = () => {
       [postId]: [...(prev[postId] || []), comment],
     }));
     setNewComment('');
-    setActiveCommentPost(null);
   };
 
   const handleDeletePost = (postId: string) => {
@@ -66,26 +72,35 @@ const Home = () => {
     <div className="space-y-6">
       {posts.map(post => (
         <Card key={post.id} className="p-6 glass-panel">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h3 className="font-medium">{post.content}</h3>
-              {post.imageUrl && (
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+              {users[post.userId]?.profileImage ? (
                 <img
-                  src={post.imageUrl}
-                  alt="Post content"
-                  className="mt-4 rounded-lg max-h-96 object-cover"
+                  src={users[post.userId].profileImage}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
                 />
+              ) : (
+                <UserIcon className="w-6 h-6 text-muted-foreground" />
               )}
             </div>
+            <div>
+              <h3 className="font-medium">{users[post.userId]?.username}</h3>
+              <p className="text-sm text-muted-foreground">
+                {format(new Date(post.createdAt), 'PPpp')}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <p className="text-base">{post.content}</p>
             
-            {(user?.id === post.userId || user?.isAdmin) && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleDeletePost(post.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+            {post.imageUrl && (
+              <img
+                src={post.imageUrl}
+                alt="Post content"
+                className="rounded-lg max-h-96 object-cover"
+              />
             )}
           </div>
 
@@ -101,33 +116,66 @@ const Home = () => {
               {comments[post.id]?.length || 0} Comments
             </Button>
 
-            {activeCommentPost === post.id && (
-              <div className="mt-4 space-y-4">
-                <div className="flex gap-2">
-                  <Input
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="Write a comment..."
-                    className="bg-secondary"
-                  />
-                  <Button onClick={() => handleAddComment(post.id)}>
-                    Post
-                  </Button>
-                </div>
-
-                <div className="space-y-2">
-                  {comments[post.id]?.map(comment => (
-                    <div
-                      key={comment.id}
-                      className="bg-secondary/50 p-3 rounded-lg"
-                    >
-                      <p className="text-sm">{comment.content}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {(user?.id === post.userId || user?.isAdmin) && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleDeletePost(post.id)}
+                className="float-right"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             )}
           </div>
+
+          {activeCommentPost === post.id && (
+            <div className="mt-4 space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Write a comment..."
+                  className="bg-secondary"
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddComment(post.id)}
+                />
+                <Button onClick={() => handleAddComment(post.id)}>
+                  Post
+                </Button>
+              </div>
+
+              <div className="space-y-4">
+                {comments[post.id]?.map(comment => (
+                  <div
+                    key={comment.id}
+                    className="flex items-start gap-3 bg-secondary/50 p-3 rounded-lg"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {users[comment.userId]?.profileImage ? (
+                        <img
+                          src={users[comment.userId].profileImage}
+                          alt="Profile"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <UserIcon className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-medium text-sm">
+                          {users[comment.userId]?.username}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(comment.createdAt), 'Pp')}
+                        </span>
+                      </div>
+                      <p className="text-sm mt-1">{comment.content}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
       ))}
     </div>
