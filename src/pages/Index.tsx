@@ -1,23 +1,83 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { User } from "lucide-react";
+import { storage } from '@/lib/storage';
+import { useAuth, persistSession } from '@/lib/auth';
 
 const Index = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { isAuthenticated, setUser } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/home');
+    }
+  }, [isAuthenticated, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Authentication logic will be implemented here
-    toast({
-      title: "Coming soon",
-      description: "Authentication system will be implemented in the next step",
-    });
+
+    try {
+      if (isLogin) {
+        const user = await storage.validateUser(email, password);
+        if (user) {
+          setUser(user);
+          persistSession(user);
+          toast({
+            title: "Welcome back!",
+            description: "Successfully logged in",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: "Invalid email or password",
+            variant: "destructive",
+          });
+        }
+      } else {
+        if (password.length < 6) {
+          toast({
+            title: "Error",
+            description: "Password must be at least 6 characters long",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const user = await storage.createUser(username, email, password);
+        if (user) {
+          setUser(user);
+          persistSession(user);
+          toast({
+            title: "Welcome!",
+            description: "Account created successfully",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: "Username or email already exists",
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -39,8 +99,11 @@ const Index = () => {
               <Label htmlFor="username">Username</Label>
               <Input
                 id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 placeholder="Choose a username"
                 className="bg-secondary"
+                required
               />
             </div>
           )}
@@ -50,8 +113,11 @@ const Index = () => {
             <Input
               id="email"
               type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
               className="bg-secondary"
+              required
             />
           </div>
           
@@ -60,8 +126,11 @@ const Index = () => {
             <Input
               id="password"
               type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
               className="bg-secondary"
+              required
             />
           </div>
           
